@@ -158,8 +158,9 @@ VESSEL_CONFIGS = {
 }
 
 
-# Predefined ports in Mediterranean
+# Predefined ports - Mediterranean + Indian Ocean
 MEDITERRANEAN_PORTS = {
+    # Mediterranean Ports
     "barcelona": Port(name="Barcelona", coordinate=Coordinate(lat=41.3851, lon=2.1734)),
     "marseille": Port(name="Marseille", coordinate=Coordinate(lat=43.2965, lon=5.3698)),
     "genoa": Port(name="Genoa", coordinate=Coordinate(lat=44.4056, lon=8.9463)),
@@ -170,4 +171,13 @@ MEDITERRANEAN_PORTS = {
     "alexandria": Port(name="Alexandria", coordinate=Coordinate(lat=31.2001, lon=29.9187)),
     "piraeus": Port(name="Piraeus", coordinate=Coordinate(lat=37.9475, lon=23.6372)),
     "istanbul": Port(name="Istanbul", coordinate=Coordinate(lat=41.0082, lon=28.9784)),
+    # Indian Ports
+    "mumbai": Port(name="Mumbai", coordinate=Coordinate(lat=18.9388, lon=72.8354)),
+    "chennai": Port(name="Chennai", coordinate=Coordinate(lat=13.0827, lon=80.2707)),
+    "kolkata": Port(name="Kolkata", coordinate=Coordinate(lat=22.5626, lon=88.3630)),
+    "cochin": Port(name="Cochin (Kochi)", coordinate=Coordinate(lat=9.9312, lon=76.2673)),
+    "visakhapatnam": Port(name="Visakhapatnam", coordinate=Coordinate(lat=17.6868, lon=83.2185)),
+    "kandla": Port(name="Kandla", coordinate=Coordinate(lat=23.0333, lon=70.2167)),
+    "mangalore": Port(name="Mangalore", coordinate=Coordinate(lat=12.9141, lon=74.8560)),
+    "tuticorin": Port(name="Tuticorin", coordinate=Coordinate(lat=8.7642, lon=78.1348)),
 }
