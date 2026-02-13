@@ -15,12 +15,12 @@ class OceanGrid:
     Generates navigable ocean points and manages connectivity.
     """
     
-    # Mediterranean Sea bounding box (approximate)
+    # Extended bounds covering Mediterranean + Indian Ocean
     DEFAULT_BOUNDS = {
-        "min_lat": 30.0,
+        "min_lat": 5.0,   # Extended south for Indian Ocean
         "max_lat": 46.0,
         "min_lon": -6.0,
-        "max_lon": 36.0
+        "max_lon": 95.0   # Extended east for Bay of Bengal
     }
     
     # 8 directions: (row_delta, col_delta, name)
@@ -35,7 +35,7 @@ class OceanGrid:
         (1, -1, "SW"),  # Southwest
     ]
     
-    # Simple land mask for Mediterranean (approximate polygons)
+    # Simple land mask for Mediterranean + Indian Ocean (approximate polygons)
     # This helps identify which grid cells are land vs water
     LAND_POLYGONS = [
         # Spain coast (simplified)
@@ -65,6 +65,30 @@ class OceanGrid:
         [(35.7, 32.0), (35.7, 34.6), (34.5, 34.0), (34.5, 32.3)],
         # Crete
         [(35.7, 23.5), (35.7, 26.3), (34.9, 26.0), (34.9, 23.5)],
+        # Middle East (simplified)
+        [(30.0, 32.0), (32.0, 35.0), (33.0, 36.0), (37.0, 42.0), (30.0, 48.0),
+         (24.0, 51.0), (22.0, 55.0), (17.0, 54.0), (12.5, 44.0), (11.0, 43.0),
+         (12.0, 41.0), (26.0, 35.0)],
+        # Arabian Peninsula (simplified)
+        [(30.0, 35.0), (30.0, 48.0), (24.0, 51.0), (22.0, 56.0), (17.0, 54.0),
+         (12.5, 44.0), (17.0, 42.0), (20.0, 40.0), (28.0, 35.0)],
+        # India (simplified)
+        [(35.0, 70.0), (35.0, 78.0), (32.0, 77.0), (28.0, 77.0), (24.0, 73.0),
+         (23.0, 69.0), (20.0, 68.5), (18.0, 72.5), (15.0, 73.5), (14.0, 74.5),
+         (11.0, 75.5), (8.0, 77.0), (8.0, 78.5), (10.0, 80.0), (13.0, 80.5),
+         (16.0, 82.0), (19.0, 85.0), (21.0, 87.0), (22.0, 88.5), (24.0, 89.0),
+         (27.0, 89.0), (28.0, 88.0), (27.0, 85.0), (26.0, 84.0), (28.0, 80.0),
+         (30.0, 78.0)],
+        # Sri Lanka
+        [(10.0, 79.5), (10.0, 82.0), (6.0, 81.5), (6.0, 79.5)],
+        # East Africa coast (simplified)
+        [(12.0, 41.0), (11.0, 43.0), (5.0, 42.0), (2.0, 41.0), (-1.0, 41.5),
+         (-5.0, 39.5), (-10.0, 40.0), (-15.0, 40.5), (-15.0, 35.0), (-5.0, 35.0),
+         (5.0, 35.0), (12.0, 37.0)],
+        # Myanmar/Thailand coast
+        [(28.0, 92.0), (25.0, 95.0), (20.0, 93.0), (16.0, 94.0), (10.0, 98.0),
+         (8.0, 98.5), (6.0, 100.0), (6.0, 95.0), (10.0, 92.0), (20.0, 90.0),
+         (26.0, 90.0)],
     ]
     
     def __init__(
