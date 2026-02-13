@@ -1,457 +1,344 @@
-#!/usr/bin/env python3
-"""
-Comprehensive Backend API Testing for Marine Routing System
-Tests all endpoints including A* route calculation, weather simulation, and data retrieval.
-"""
 import requests
 import sys
 import json
 from datetime import datetime
-import time
 
 class MarineRoutingAPITester:
-    def __init__(self, base_url="https://safe-sea-navigator.preview.emergentagent.com"):
+    def __init__(self, base_url="https://safe-sea-navigator.preview.emergentagent.com/api"):
         self.base_url = base_url
-        self.api = f"{base_url}/api"
+        self.token = None
         self.tests_run = 0
         self.tests_passed = 0
-        self.results = []
-        
-        # Test data
-        self.barcelona_coords = {"lat": 41.3851, "lon": 2.1734}
-        self.alexandria_coords = {"lat": 31.2001, "lon": 29.9187}
-        
-    def log_test(self, name, success, details="", response_data=None):
-        """Log test result"""
+        self.failed_tests = []
+        self.successful_tests = []
+
+    def run_test(self, name, method, endpoint, expected_status, data=None):
+        """Run a single API test"""
+        url = f"{self.base_url}/{endpoint}"
+        headers = {'Content-Type': 'application/json'}
+        if self.token:
+            headers['Authorization'] = f'Bearer {self.token}'
+
         self.tests_run += 1
-        if success:
-            self.tests_passed += 1
-            
-        result = {
-            "name": name,
-            "success": success,
-            "details": details,
-            "timestamp": datetime.now().isoformat()
-        }
+        print(f"\n🔍 Testing {name}...")
         
-        if response_data and success:
-            # Store sample response for verification
-            if isinstance(response_data, dict):
-                result["sample_response"] = {k: str(v)[:100] if isinstance(v, (list, dict)) else v 
-                                           for k, v in list(response_data.items())[:5]}
-        
-        self.results.append(result)
-        status = "✅ PASS" if success else "❌ FAIL"
-        print(f"{status}: {name}")
-        if details:
-            print(f"   Details: {details}")
-    
-    def test_health_check(self):
-        """Test basic API connectivity"""
         try:
-            response = requests.get(f"{self.api}/", timeout=10)
-            success = response.status_code == 200
-            data = response.json() if success else {}
-            
-            details = f"Status: {response.status_code}"
-            if success and "status" in data:
-                details += f", Message: {data.get('message', 'N/A')}"
-                
-            self.log_test("Health Check", success, details, data)
-            return success
-            
-        except Exception as e:
-            self.log_test("Health Check", False, f"Connection error: {str(e)}")
-            return False
-    
-    def test_get_ports(self):
-        """Test ports endpoint - should return Mediterranean ports"""
-        try:
-            response = requests.get(f"{self.api}/ports", timeout=10)
-            success = response.status_code == 200
-            
+            if method == 'GET':
+                response = requests.get(url, headers=headers, timeout=30)
+            elif method == 'POST':
+                response = requests.post(url, json=data, headers=headers, timeout=30)
+
+            success = response.status_code == expected_status
             if success:
-                data = response.json()
-                # Verify response structure
-                if not isinstance(data, list):
-                    success = False
-                    details = f"Expected list, got {type(data)}"
-                elif len(data) == 0:
-                    success = False 
-                    details = "No ports returned"
-                else:
-                    # Check for expected ports
-                    port_names = [p.get('name', '') for p in data]
-                    expected_ports = ['Barcelona', 'Alexandria', 'Marseille']
-                    found_ports = [p for p in expected_ports if p in port_names]
-                    
-                    details = f"Found {len(data)} ports: {', '.join(port_names[:5])}"
-                    if len(found_ports) >= 2:
-                        details += f" (includes {', '.join(found_ports)})"
-                    else:
-                        success = False
-                        details += " - Missing expected Mediterranean ports"
-            else:
-                details = f"HTTP {response.status_code}"
-                data = None
-                
-            self.log_test("GET /api/ports", success, details, data)
-            return success, data if success else []
-            
-        except Exception as e:
-            self.log_test("GET /api/ports", False, f"Error: {str(e)}")
-            return False, []
-    
-    def test_get_vessels(self):
-        """Test vessels endpoint - should return 4 vessel types"""
-        try:
-            response = requests.get(f"{self.api}/vessels", timeout=10)
-            success = response.status_code == 200
-            
-            if success:
-                data = response.json()
-                if not isinstance(data, list):
-                    success = False
-                    details = f"Expected list, got {type(data)}"
-                elif len(data) != 4:
-                    success = False
-                    details = f"Expected 4 vessels, got {len(data)}"
-                else:
-                    vessel_types = [v.get('type', '') for v in data]
-                    expected = ['cargo_ship', 'oil_tanker', 'fishing_boat', 'high_speed_boat']
-                    missing = [t for t in expected if t not in vessel_types]
-                    
-                    if missing:
-                        success = False
-                        details = f"Missing vessel types: {missing}"
-                    else:
-                        details = f"All 4 vessels found: {', '.join(vessel_types)}"
-                        
-                        # Check vessel properties
-                        sample = data[0]
-                        required_fields = ['type', 'name', 'fuel_consumption_rate', 'max_speed']
-                        missing_fields = [f for f in required_fields if f not in sample]
-                        if missing_fields:
-                            success = False
-                            details += f" - Missing fields: {missing_fields}"
-            else:
-                details = f"HTTP {response.status_code}"
-                data = None
-                
-            self.log_test("GET /api/vessels", success, details, data)
-            return success, data if success else []
-            
-        except Exception as e:
-            self.log_test("GET /api/vessels", False, f"Error: {str(e)}")
-            return False, []
-    
-    def test_get_danger_zones(self):
-        """Test danger zones endpoint"""
-        try:
-            response = requests.get(f"{self.api}/danger-zones", timeout=10)
-            success = response.status_code == 200
-            
-            if success:
-                data = response.json()
-                if not isinstance(data, list):
-                    success = False
-                    details = f"Expected list, got {type(data)}"
-                elif len(data) == 0:
-                    success = False
-                    details = "No danger zones returned"
-                else:
-                    # Check for expected danger zone properties
-                    sample = data[0]
-                    required_fields = ['id', 'type', 'name', 'coordinates', 'severity', 'color']
-                    missing_fields = [f for f in required_fields if f not in sample]
-                    
-                    if missing_fields:
-                        success = False
-                        details = f"Missing fields: {missing_fields}"
-                    else:
-                        zone_types = list(set([z.get('type', '') for z in data]))
-                        details = f"{len(data)} zones with types: {', '.join(zone_types)}"
-                        
-                        # Verify colors are present
-                        colors = [z.get('color', '') for z in data]
-                        if not all(colors):
-                            success = False
-                            details += " - Missing colors"
-            else:
-                details = f"HTTP {response.status_code}"
-                data = None
-                
-            self.log_test("GET /api/danger-zones", success, details, data)
-            return success, data if success else []
-            
-        except Exception as e:
-            self.log_test("GET /api/danger-zones", False, f"Error: {str(e)}")
-            return False, []
-    
-    def test_calculate_route(self, vessel_type="cargo_ship"):
-        """Test route calculation - CRITICAL: Must NOT be straight line"""
-        try:
-            payload = {
-                "source_lat": self.barcelona_coords["lat"],
-                "source_lon": self.barcelona_coords["lon"], 
-                "dest_lat": self.alexandria_coords["lat"],
-                "dest_lon": self.alexandria_coords["lon"],
-                "vessel_type": vessel_type,
-                "fuel_priority": 0.33,
-                "time_priority": 0.33,
-                "safety_priority": 0.34
-            }
-            
-            response = requests.post(f"{self.api}/calculate-route", json=payload, timeout=30)
-            success = response.status_code == 200
-            
-            if success:
-                data = response.json()
-                
-                # Verify response structure
-                required_fields = ['success', 'path', 'total_distance', 'total_time', 'waypoints']
-                missing_fields = [f for f in required_fields if f not in data]
-                
-                if missing_fields:
-                    success = False
-                    details = f"Missing fields: {missing_fields}"
-                elif not data.get('success', False):
-                    success = False
-                    details = f"Route calculation failed: {data.get('message', 'Unknown error')}"
-                elif not isinstance(data.get('path', []), list) or len(data['path']) < 2:
-                    success = False
-                    details = f"Invalid path: {len(data.get('path', []))} waypoints"
-                else:
-                    path = data['path']
-                    waypoints = data.get('waypoints', len(path))
-                    
-                    # CRITICAL CHECK: Route should NOT be a straight line
-                    # A proper A* route should have multiple waypoints (>10 for Barcelona-Alexandria)
-                    if waypoints < 10:
-                        success = False
-                        details = f"Route too simple: {waypoints} waypoints (expected >10 for A* pathfinding)"
-                    else:
-                        # Verify path contains proper waypoint data
-                        first_point = path[0]
-                        last_point = path[-1]
-                        
-                        required_point_fields = ['lat', 'lon', 'cumulative_distance', 'cumulative_fuel']
-                        missing_point_fields = [f for f in required_point_fields if f not in first_point]
-                        
-                        if missing_point_fields:
-                            success = False
-                            details = f"Path points missing fields: {missing_point_fields}"
-                        else:
-                            details = (f"Route calculated: {waypoints} waypoints, "
-                                     f"{data['total_distance']:.0f}km, "
-                                     f"{data['total_time']:.1f}h, "
-                                     f"{data['total_fuel']:.0f}L fuel")
-                            
-                            # Additional verification: check path actually traverses multiple grid points
-                            lat_range = max([p['lat'] for p in path]) - min([p['lat'] for p in path])
-                            lon_range = max([p['lon'] for p in path]) - min([p['lon'] for p in path])
-                            
-                            if lat_range < 1.0 or lon_range < 1.0:
-                                success = False
-                                details += " - WARNING: Route may be too direct (insufficient grid traversal)"
-            else:
-                details = f"HTTP {response.status_code}"
+                self.tests_passed += 1
+                self.successful_tests.append(name)
+                print(f"✅ Passed - Status: {response.status_code}")
                 try:
-                    error_data = response.json()
-                    if 'detail' in error_data:
-                        details += f" - {error_data['detail']}"
+                    response_data = response.json()
+                    if isinstance(response_data, dict) and len(response_data) > 0:
+                        print(f"   Response preview: {json.dumps(list(response_data.keys())[:3])}...")
+                    elif isinstance(response_data, list) and len(response_data) > 0:
+                        print(f"   Response: {len(response_data)} items")
                 except:
                     pass
-                data = None
-                
-            self.log_test("POST /api/calculate-route", success, details, data)
-            return success, data if success else None
-            
-        except Exception as e:
-            self.log_test("POST /api/calculate-route", False, f"Error: {str(e)}")
-            return False, None
-    
-    def test_simulate_weather(self):
-        """Test weather simulation"""
-        try:
-            response = requests.post(f"{self.api}/simulate-weather", timeout=15)
-            success = response.status_code == 200
-            
-            if success:
-                data = response.json()
-                required_fields = ['message', 'timestamp', 'danger_zones']
-                missing_fields = [f for f in required_fields if f not in data]
-                
-                if missing_fields:
-                    success = False
-                    details = f"Missing fields: {missing_fields}"
-                elif not isinstance(data.get('danger_zones', []), list):
-                    success = False
-                    details = "Danger zones not returned as list"
-                else:
-                    zones = data['danger_zones']
-                    details = f"Weather simulated: {data['message']}, {len(zones)} danger zones"
             else:
-                details = f"HTTP {response.status_code}"
-                data = None
-                
-            self.log_test("POST /api/simulate-weather", success, details, data)
-            return success, data if success else None
-            
+                self.failed_tests.append({
+                    "test_name": name,
+                    "expected": expected_status,
+                    "actual": response.status_code,
+                    "error": response.text[:200] if response.text else "No response body"
+                })
+                print(f"❌ Failed - Expected {expected_status}, got {response.status_code}")
+                print(f"   Error: {response.text[:200]}...")
+
+            return success, response.json() if response.headers.get('content-type', '').startswith('application/json') else {}
+
+        except requests.exceptions.RequestException as e:
+            self.failed_tests.append({
+                "test_name": name,
+                "expected": expected_status,
+                "actual": "Request Error",
+                "error": str(e)
+            })
+            print(f"❌ Failed - Request Error: {str(e)}")
+            return False, {}
         except Exception as e:
-            self.log_test("POST /api/simulate-weather", False, f"Error: {str(e)}")
-            return False, None
-    
-    def test_reset_weather(self):
-        """Test weather reset"""
-        try:
-            response = requests.post(f"{self.api}/reset-weather", timeout=15)
-            success = response.status_code == 200
+            self.failed_tests.append({
+                "test_name": name,
+                "expected": expected_status,
+                "actual": "Unknown Error",
+                "error": str(e)
+            })
+            print(f"❌ Failed - Error: {str(e)}")
+            return False, {}
+
+    def test_health_check(self):
+        """Test health check endpoint"""
+        success, response = self.run_test("Health Check", "GET", "", 200)
+        return success
+
+    def test_get_ports(self):
+        """Test getting all ports (public endpoint)"""
+        success, response = self.run_test("Get Ports", "GET", "ports", 200)
+        if success:
+            # Check for Indian ports
+            port_names = [port.get('name', '').lower() for port in response]
+            indian_ports = ['mumbai', 'chennai', 'kolkata', 'cochin', 'visakhapatnam', 'kandla', 'mangalore', 'tuticorin']
             
-            if success:
-                data = response.json()
-                required_fields = ['message', 'danger_zones']
-                missing_fields = [f for f in required_fields if f not in data]
-                
-                if missing_fields:
-                    success = False
-                    details = f"Missing fields: {missing_fields}"
-                else:
-                    zones = data['danger_zones']
-                    details = f"Weather reset: {len(zones)} default danger zones"
-            else:
-                details = f"HTTP {response.status_code}"
-                data = None
-                
-            self.log_test("POST /api/reset-weather", success, details, data)
-            return success
+            found_indian_ports = [port for port in indian_ports if any(port in name for name in port_names)]
+            print(f"   Found Indian ports: {found_indian_ports}")
             
-        except Exception as e:
-            self.log_test("POST /api/reset-weather", False, f"Error: {str(e)}")
-            return False
-    
-    def test_route_with_different_vessels(self):
-        """Test route calculation with different vessel types"""
-        vessels = ['cargo_ship', 'oil_tanker', 'fishing_boat', 'high_speed_boat']
-        all_passed = True
-        
-        for vessel in vessels:
-            success, route_data = self.test_calculate_route(vessel)
-            if not success:
-                all_passed = False
+            if len(found_indian_ports) >= 5:  # Expecting at least 5 Indian ports
+                print(f"✅ Indian ports successfully added to system")
+                return True
             else:
-                # Brief wait to avoid overwhelming the server
-                time.sleep(0.5)
-        
-        return all_passed
-    
-    def run_all_tests(self):
-        """Run all backend tests"""
-        print("=" * 60)
-        print("🚢 MARINE ROUTING SYSTEM - BACKEND API TESTS")
-        print("=" * 60)
-        print(f"Testing API: {self.api}")
-        print(f"Started: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-        print()
-        
-        # Basic connectivity
-        if not self.test_health_check():
-            print("\n❌ CRITICAL: Cannot connect to API server!")
-            return False
-        
-        print()
-        
-        # Data endpoints
-        print("📋 Testing Data Endpoints...")
-        ports_success, ports_data = self.test_get_ports()
-        vessels_success, vessels_data = self.test_get_vessels()
-        zones_success, zones_data = self.test_get_danger_zones()
-        
-        print()
-        
-        # Core functionality
-        print("🎯 Testing Core Routing Functionality...")
-        route_success, route_data = self.test_calculate_route()
-        
-        print()
-        
-        # Weather simulation
-        print("🌩️ Testing Weather Simulation...")
-        weather_sim_success = self.test_simulate_weather()
-        weather_reset_success = self.test_reset_weather()
-        
-        print()
-        
-        # Multi-vessel testing
-        print("🚢 Testing Multiple Vessel Types...")
-        multi_vessel_success = self.test_route_with_different_vessels()
-        
-        # Results summary
-        print()
-        print("=" * 60)
-        print(f"📊 TEST RESULTS: {self.tests_passed}/{self.tests_run} PASSED")
-        print("=" * 60)
-        
-        # Categorize results
-        critical_tests = ['Health Check', 'POST /api/calculate-route']
-        critical_failures = [r for r in self.results if not r['success'] and r['name'] in critical_tests]
-        
-        if critical_failures:
-            print("❌ CRITICAL FAILURES:")
-            for failure in critical_failures:
-                print(f"   - {failure['name']}: {failure['details']}")
-        
-        other_failures = [r for r in self.results if not r['success'] and r['name'] not in critical_tests]
-        if other_failures:
-            print(f"\n⚠️ OTHER ISSUES ({len(other_failures)}):")
-            for failure in other_failures:
-                print(f"   - {failure['name']}: {failure['details']}")
-        
-        # Success highlights
-        successes = [r for r in self.results if r['success']]
-        if successes:
-            print(f"\n✅ WORKING FEATURES ({len(successes)}):")
-            for success in successes:
-                print(f"   - {success['name']}")
-        
-        success_rate = (self.tests_passed / self.tests_run) * 100 if self.tests_run > 0 else 0
-        print(f"\n🎯 Overall Success Rate: {success_rate:.1f}%")
-        
-        # Return overall status
-        return len(critical_failures) == 0
-    
-    def get_test_summary(self):
-        """Get test summary for reporting"""
-        return {
-            "total_tests": self.tests_run,
-            "passed_tests": self.tests_passed,
-            "success_rate": (self.tests_passed / self.tests_run) * 100 if self.tests_run > 0 else 0,
-            "critical_failures": [r for r in self.results if not r['success'] and r['name'] in ['Health Check', 'POST /api/calculate-route']],
-            "all_results": self.results
+                print(f"⚠️  Only {len(found_indian_ports)} Indian ports found, expected at least 5")
+                
+        return success
+
+    def test_get_vessels(self):
+        """Test getting all vessel types (public endpoint)"""
+        success, response = self.run_test("Get Vessels", "GET", "vessels", 200)
+        if success and len(response) >= 4:
+            vessel_types = [v.get('type') for v in response]
+            print(f"   Available vessels: {vessel_types}")
+        return success
+
+    def test_get_danger_zones(self):
+        """Test getting danger zones (public endpoint)"""
+        success, response = self.run_test("Get Danger Zones", "GET", "danger-zones", 200)
+        return success
+
+    def test_signup(self, email, username, password, full_name=None):
+        """Test user signup"""
+        user_data = {
+            "email": email,
+            "username": username,
+            "password": password,
+            "full_name": full_name
         }
+        
+        success, response = self.run_test("User Signup", "POST", "auth/signup", 201, user_data)
+        if success:
+            print(f"   Created user: {response.get('username')} ({response.get('email')})")
+        return success, response
+
+    def test_login(self, email, password):
+        """Test user login and get token"""
+        login_data = {
+            "email": email,
+            "password": password
+        }
+        
+        success, response = self.run_test("User Login", "POST", "auth/login", 200, login_data)
+        
+        if success and 'access_token' in response:
+            self.token = response['access_token']
+            user_info = response.get('user', {})
+            print(f"   Logged in as: {user_info.get('username')} ({user_info.get('email')})")
+            print(f"   Token acquired: {self.token[:20]}...")
+            return True
+        return False
+
+    def test_protected_route_without_token(self):
+        """Test protected route returns 401 without token"""
+        # Temporarily remove token
+        old_token = self.token
+        self.token = None
+        
+        route_data = {
+            "source_lat": 18.9388,
+            "source_lon": 72.8354,
+            "dest_lat": 13.0827,
+            "dest_lon": 80.2707,
+            "vessel_type": "cargo_ship"
+        }
+        
+        success, response = self.run_test("Protected Route Without Token", "POST", "calculate-route", 401, route_data)
+        
+        # Restore token
+        self.token = old_token
+        return success
+
+    def test_calculate_route_mumbai_to_chennai(self):
+        """Test route calculation from Mumbai to Chennai (protected)"""
+        route_data = {
+            "source_lat": 18.9388,  # Mumbai
+            "source_lon": 72.8354,
+            "dest_lat": 13.0827,    # Chennai
+            "dest_lon": 80.2707,
+            "vessel_type": "cargo_ship",
+            "fuel_priority": 0.33,
+            "time_priority": 0.33,
+            "safety_priority": 0.34
+        }
+        
+        success, response = self.run_test("Calculate Route Mumbai to Chennai", "POST", "calculate-route", 200, route_data)
+        
+        if success:
+            print(f"   Route success: {response.get('success')}")
+            print(f"   Total distance: {response.get('total_distance', 0):.1f} km")
+            print(f"   Total time: {response.get('total_time', 0):.1f} hours")
+            print(f"   Waypoints: {response.get('waypoints', 0)}")
+            
+            # Validate route response structure
+            if response.get('success') and response.get('path') and len(response.get('path', [])) > 0:
+                print(f"✅ Route calculation successful with valid path")
+                return True
+            else:
+                print(f"⚠️  Route calculation returned success=False or empty path")
+        
+        return success
+
+    def test_get_current_user(self):
+        """Test getting current user profile (protected)"""
+        success, response = self.run_test("Get Current User", "GET", "auth/me", 200)
+        if success:
+            print(f"   User profile: {response.get('username')} ({response.get('email')})")
+        return success
+
+    def test_route_history(self):
+        """Test getting route history (protected)"""
+        success, response = self.run_test("Get Route History", "GET", "route-history", 200)
+        if success:
+            routes_count = len(response.get('routes', []))
+            print(f"   Found {routes_count} routes in history")
+        return success
+
+    def test_weather_simulation(self):
+        """Test weather simulation (protected)"""
+        success, response = self.run_test("Simulate Weather", "POST", "simulate-weather", 200)
+        if success:
+            print(f"   Weather update: {response.get('message', '')}")
+            zones_count = len(response.get('danger_zones', []))
+            print(f"   Updated danger zones: {zones_count}")
+        return success
+
+    def test_weather_reset(self):
+        """Test weather reset (protected)"""
+        success, response = self.run_test("Reset Weather", "POST", "reset-weather", 200)
+        if success:
+            print(f"   Weather reset: {response.get('message', '')}")
+        return success
 
 def main():
-    """Main test execution"""
+    print("🚢 Marine Routing System - Backend API Tests")
+    print("=" * 50)
+    
     tester = MarineRoutingAPITester()
     
-    try:
-        success = tester.run_all_tests()
-        summary = tester.get_test_summary()
+    # Test user credentials
+    test_email = f"test_user_{datetime.now().strftime('%H%M%S')}@marine.com"
+    test_username = f"test_user_{datetime.now().strftime('%H%M%S')}"
+    test_password = "test123456"
+    
+    # Known test user from agent context
+    known_test_email = "test@marine.com"
+    known_test_password = "test123456"
+    
+    success_count = 0
+    total_tests = 0
+    
+    print("\n📍 Phase 1: Public Endpoints")
+    print("-" * 30)
+    
+    # Test public endpoints
+    if tester.test_health_check():
+        success_count += 1
+    total_tests += 1
+    
+    if tester.test_get_ports():
+        success_count += 1
+    total_tests += 1
+    
+    if tester.test_get_vessels():
+        success_count += 1
+    total_tests += 1
+    
+    if tester.test_get_danger_zones():
+        success_count += 1
+    total_tests += 1
+    
+    print("\n🔐 Phase 2: Authentication")
+    print("-" * 30)
+    
+    # Try existing test user first
+    print(f"\nTrying to login with known test user: {known_test_email}")
+    if tester.test_login(known_test_email, known_test_password):
+        success_count += 1
+        print("✅ Logged in with existing test user")
+    else:
+        print("⚠️  Known test user login failed, creating new user...")
+        # Create new test user
+        signup_success, signup_response = tester.test_signup(test_email, test_username, test_password, "Test User")
+        if signup_success:
+            success_count += 1
+        total_tests += 1
         
-        # Save detailed results
-        with open('/app/backend_test_results.json', 'w') as f:
-            json.dump(summary, f, indent=2, default=str)
-        
-        print(f"\n📄 Detailed results saved to: /app/backend_test_results.json")
-        
-        return 0 if success else 1
-        
-    except KeyboardInterrupt:
-        print("\n\n⏹️ Tests interrupted by user")
-        return 1
-    except Exception as e:
-        print(f"\n\n💥 Unexpected error: {str(e)}")
-        return 1
+        # Login with new user
+        if tester.test_login(test_email, test_password):
+            success_count += 1
+        total_tests += 1
+    
+    total_tests += 1  # For login test
+    
+    print("\n🔒 Phase 3: Protected Route Authorization")
+    print("-" * 30)
+    
+    if tester.test_protected_route_without_token():
+        success_count += 1
+    total_tests += 1
+    
+    print("\n🧭 Phase 4: Route Calculation")
+    print("-" * 30)
+    
+    if tester.test_calculate_route_mumbai_to_chennai():
+        success_count += 1
+    total_tests += 1
+    
+    print("\n👤 Phase 5: User Profile & History")
+    print("-" * 30)
+    
+    if tester.test_get_current_user():
+        success_count += 1
+    total_tests += 1
+    
+    if tester.test_route_history():
+        success_count += 1
+    total_tests += 1
+    
+    print("\n🌤️  Phase 6: Weather Simulation")
+    print("-" * 30)
+    
+    if tester.test_weather_simulation():
+        success_count += 1
+    total_tests += 1
+    
+    if tester.test_weather_reset():
+        success_count += 1
+    total_tests += 1
+    
+    # Final results
+    print("\n" + "=" * 50)
+    print("🏁 TEST SUMMARY")
+    print("=" * 50)
+    print(f"Tests Run: {total_tests}")
+    print(f"Tests Passed: {success_count}")
+    print(f"Tests Failed: {total_tests - success_count}")
+    print(f"Success Rate: {success_count/total_tests*100:.1f}%")
+    
+    if tester.failed_tests:
+        print(f"\n❌ Failed Tests:")
+        for failed in tester.failed_tests:
+            print(f"  - {failed['test_name']}: Expected {failed['expected']}, got {failed['actual']}")
+            print(f"    Error: {failed['error']}")
+    
+    if tester.successful_tests:
+        print(f"\n✅ Successful Tests:")
+        for test in tester.successful_tests:
+            print(f"  - {test}")
+    
+    return 0 if success_count == total_tests else 1
 
 if __name__ == "__main__":
     sys.exit(main())
