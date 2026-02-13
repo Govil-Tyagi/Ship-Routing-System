@@ -1,34 +1,338 @@
-.App-logo {
-    height: 40vmin;
-    pointer-events: none;
+/* Marine Routing System - Component Styles */
+
+/* Main Layout */
+.app-container {
+  display: grid;
+  grid-template-columns: 320px 1fr;
+  height: 100vh;
+  overflow: hidden;
 }
 
-@media (prefers-reduced-motion: no-preference) {
-    .App-logo {
-        animation: App-logo-spin infinite 20s linear;
-    }
+/* Control Panel */
+.control-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding: 1rem;
+  overflow-y: auto;
+  background: #0F172A;
+  border-right: 1px solid rgba(148, 163, 184, 0.1);
 }
 
-.App-header {
-    background-color: #0f0f10;
-    min-height: 100vh;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    font-size: calc(10px + 2vmin);
-    color: white;
+/* Map Container */
+.map-container {
+  position: relative;
+  width: 100%;
+  height: 100%;
 }
 
-.App-link {
-    color: #61dafb;
+/* Stats Overlay */
+.stats-overlay {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  z-index: 1000;
+  width: 280px;
 }
 
-@keyframes App-logo-spin {
-    from {
-        transform: rotate(0deg);
-    }
-    to {
-        transform: rotate(360deg);
-    }
+/* Alert Overlay */
+.alert-overlay {
+  position: absolute;
+  bottom: 1rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1000;
+  max-width: 400px;
+}
+
+/* Section Headers */
+.section-header {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-weight: 600;
+  font-size: 0.75rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #94A3B8;
+  margin-bottom: 0.75rem;
+}
+
+/* Vessel Cards Grid */
+.vessel-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.5rem;
+}
+
+/* Port Selector */
+.port-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem;
+  background: #1E293B;
+  border-radius: 4px;
+}
+
+.port-indicator {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.port-indicator.source {
+  background: #10B981;
+}
+
+.port-indicator.destination {
+  background: #EF4444;
+}
+
+/* Priority Sliders */
+.priority-slider {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.priority-label {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.75rem;
+}
+
+.priority-label span:first-child {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: #F8FAFC;
+}
+
+.priority-label span:last-child {
+  font-family: 'JetBrains Mono', monospace;
+  color: #38BDF8;
+}
+
+/* Stats Cards */
+.stat-card {
+  display: flex;
+  flex-direction: column;
+  padding: 0.75rem;
+  background: rgba(30, 41, 59, 0.8);
+  border-radius: 4px;
+  border: 1px solid rgba(148, 163, 184, 0.1);
+}
+
+.stat-label {
+  font-size: 0.625rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #94A3B8;
+  margin-bottom: 0.25rem;
+}
+
+.stat-value {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 1.25rem;
+  font-weight: 500;
+  color: #F8FAFC;
+}
+
+.stat-unit {
+  font-size: 0.75rem;
+  color: #64748B;
+  margin-left: 0.25rem;
+}
+
+/* Risk Indicator */
+.risk-indicator {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.risk-bar {
+  flex: 1;
+  height: 6px;
+  background: #1E293B;
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.risk-fill {
+  height: 100%;
+  transition: width 0.3s ease;
+}
+
+.risk-fill.low {
+  background: #10B981;
+}
+
+.risk-fill.medium {
+  background: #F59E0B;
+}
+
+.risk-fill.high {
+  background: #EF4444;
+}
+
+/* Action Buttons */
+.action-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  font-family: 'Inter', sans-serif;
+  font-weight: 600;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+  cursor: pointer;
+}
+
+.action-btn.primary {
+  background: #0EA5E9;
+  color: #020617;
+  border: none;
+}
+
+.action-btn.primary:hover {
+  background: #38BDF8;
+}
+
+.action-btn.primary:disabled {
+  background: #334155;
+  color: #64748B;
+  cursor: not-allowed;
+}
+
+.action-btn.secondary {
+  background: transparent;
+  color: #94A3B8;
+  border: 1px solid rgba(148, 163, 184, 0.3);
+}
+
+.action-btn.secondary:hover {
+  background: rgba(148, 163, 184, 0.1);
+  color: #F8FAFC;
+}
+
+/* Legend */
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.75rem;
+  color: #94A3B8;
+}
+
+.legend-color {
+  width: 12px;
+  height: 12px;
+  border-radius: 2px;
+}
+
+.legend-color.danger {
+  background: #EF4444;
+}
+
+.legend-color.warning {
+  background: #F59E0B;
+}
+
+.legend-color.safe {
+  background: #10B981;
+}
+
+.legend-color.route {
+  background: #38BDF8;
+}
+
+/* Loading Spinner */
+.loading-spinner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+}
+
+.spinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid #1E293B;
+  border-top-color: #38BDF8;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Weather Alert */
+.weather-alert {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 1rem;
+  background: rgba(245, 158, 11, 0.1);
+  border: 1px solid #F59E0B;
+  border-radius: 4px;
+}
+
+.weather-alert.danger {
+  background: rgba(239, 68, 68, 0.1);
+  border-color: #EF4444;
+}
+
+/* Tooltip Content */
+.route-tooltip {
+  min-width: 150px;
+}
+
+.route-tooltip-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 0.25rem 0;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.1);
+}
+
+.route-tooltip-row:last-child {
+  border-bottom: none;
+}
+
+.route-tooltip-label {
+  color: #94A3B8;
+}
+
+.route-tooltip-value {
+  font-family: 'JetBrains Mono', monospace;
+  color: #38BDF8;
+}
+
+/* Responsive adjustments */
+@media (max-width: 1024px) {
+  .app-container {
+    grid-template-columns: 280px 1fr;
+  }
+}
+
+@media (max-width: 768px) {
+  .app-container {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto 1fr;
+  }
+  
+  .control-panel {
+    max-height: 40vh;
+    border-right: none;
+    border-bottom: 1px solid rgba(148, 163, 184, 0.1);
+  }
+  
+  .stats-overlay {
+    width: calc(100% - 2rem);
+  }
 }
