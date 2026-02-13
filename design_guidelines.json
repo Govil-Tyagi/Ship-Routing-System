@@ -1,0 +1,169 @@
+{
+  "identity": {
+    "persona": "E1 - The Anti-AI Designer",
+    "mission": "Create a tactical, high-precision marine routing interface that feels like a modern naval command center, avoiding generic SaaS aesthetics.",
+    "principles": [
+      "Tactical Density: High information density, zero clutter.",
+      "Night Vision: Dark mode is mandatory for bridge operations.",
+      "Data over Decoration: Every pixel must serve the navigator.",
+      "Feedback: Instant visual response to route changes.",
+      "Safety First: Danger zones must be unmistakably visible."
+    ]
+  },
+  "typography": {
+    "headings": {
+      "family": "Barlow Condensed, sans-serif",
+      "weights": ["600", "700"],
+      "usage": "Section headers, vessel names, alert titles",
+      "letterSpacing": "tracking-tight"
+    },
+    "body": {
+      "family": "JetBrains Mono, monospace",
+      "weights": ["400", "500"],
+      "usage": "Data points, coordinates, metrics, tooltips",
+      "letterSpacing": "tracking-normal"
+    },
+    "labels": {
+      "family": "Inter, sans-serif",
+      "weights": ["600"],
+      "usage": "UI labels, button text",
+      "transform": "uppercase",
+      "letterSpacing": "tracking-widest"
+    }
+  },
+  "colors": {
+    "theme": "dark",
+    "background": {
+      "base": "#020617",
+      "surface": "#0F172A",
+      "overlay": "#1E293B"
+    },
+    "text": {
+      "primary": "#F8FAFC",
+      "secondary": "#94A3B8",
+      "muted": "#475569",
+      "accent": "#38BDF8"
+    },
+    "status": {
+      "danger": "#EF4444",
+      "warning": "#F59E0B",
+      "success": "#10B981",
+      "info": "#0EA5E9"
+    },
+    "marine": {
+      "ocean": "#0B1121",
+      "route": "#38BDF8",
+      "route_alt": "#6366F1",
+      "land": "#1E293B",
+      "danger_zone_fill": "rgba(239, 68, 68, 0.1)",
+      "danger_zone_border": "#EF4444"
+    }
+  },
+  "visual_enhancers": {
+    "borders": "1px solid rgba(148, 163, 184, 0.1)",
+    "glassmorphism": "backdrop-blur-md bg-slate-900/80 border border-slate-700/50",
+    "shadows": {
+      "card": "0 4px 6px -1px rgba(0, 0, 0, 0.5)",
+      "glow": "0 0 15px rgba(56, 189, 248, 0.3)"
+    },
+    "animations": {
+      "pulse": "animate-pulse",
+      "radar": "radar-sweep 4s infinite linear"
+    }
+  },
+  "layout_strategy": {
+    "type": "High Density Grid (Mode B)",
+    "grid_cols": "grid-cols-12",
+    "gap": "gap-4",
+    "spacing_scale": "Compact (p-4, p-6)",
+    "z_index_layers": {
+      "map": 0,
+      "overlays": 10,
+      "controls": 20,
+      "modals": 50,
+      "toasts": 100
+    }
+  },
+  "components": {
+    "map": {
+      "library": "Leaflet",
+      "style": "Dark Matter (Custom CSS Filter)",
+      "css_filter": "invert(100%) hue-rotate(180deg) brightness(95%) contrast(90%)",
+      "tiles_url": "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+      "container_class": "h-full w-full rounded-none border-0"
+    },
+    "vessel_selector": {
+      "style": "Carousel/Card Grid",
+      "image_aspect": "aspect-video",
+      "selected_state": "ring-2 ring-sky-500 bg-slate-800"
+    },
+    "sliders": {
+      "component": "Shadcn Slider",
+      "customization": "h-2 bg-slate-700 rounded-none cursor-pointer"
+    },
+    "stats_panel": {
+      "position": "Sidebar (Left or Right)",
+      "style": "Glassmorphism HUD"
+    }
+  },
+  "assets": {
+    "images": [
+      {
+        "category": "vessels",
+        "name": "Cargo Ship",
+        "url": "https://images.unsplash.com/photo-1770926605147-3c5d37cf8c47",
+        "alt": "Large Red Cargo Container Ship"
+      },
+      {
+        "category": "vessels",
+        "name": "Oil Tanker",
+        "url": "https://images.unsplash.com/photo-1655763161700-8f284f0ceca9",
+        "alt": "Oil Tanker Vessel"
+      },
+      {
+        "category": "vessels",
+        "name": "Fishing Boat",
+        "url": "https://images.unsplash.com/photo-1596556864711-a9549fc3022c",
+        "alt": "Fishing Trawler"
+      },
+      {
+        "category": "vessels",
+        "name": "High Speed Boat",
+        "url": "https://images.unsplash.com/photo-1645074685419-65072e107ffb",
+        "alt": "High Speed Patrol Boat"
+      }
+    ],
+    "icons": {
+      "library": "lucide-react",
+      "mappings": {
+        "storm": "CloudLightning",
+        "piracy": "Skull",
+        "military": "ShieldAlert",
+        "port": "Anchor",
+        "fuel": "Fuel",
+        "time": "Clock",
+        "safety": "LifeBuoy",
+        "wind": "Wind"
+      }
+    }
+  },
+  "instructions_to_main_agent": [
+    "Install 'leaflet' and 'react-leaflet' immediately.",
+    "Use the CSS filter trick on the TileLayer to achieve the dark mode map without needing an API key for dark tiles.",
+    "Implement the 'A*' algorithm in a separate utility file 'routing_engine.py' or 'routing_service.js' (backend or frontend as per architecture). If backend is Python, use NetworkX or custom implementation.",
+    "The grid system must be generated dynamically based on the viewport or a fixed region (Mediterranean).",
+    "Danger Zones should be polygons on the map with red fill and 'danger' pulsing animation.",
+    "Use 'sonner' for all alerts (weather changes, route updates).",
+    "Ensure the dashboard is responsive but prioritize desktop 'Command Center' view.",
+    "Vessel animation should move a marker along the calculated polyline path."
+  ],
+  "universal_guidelines": [
+    "Do not use gradients for the main background; use solid deep slate (#020617).",
+    "All interactive elements must have 'data-testid' attributes.",
+    "Use 'JetBrains Mono' for all numerical data to ensure tabular alignment.",
+    "Buttons should be rectangular or slightly rounded (rounded-sm) to match the tactical theme.",
+    "Avoid 'happy' curved shapes; stick to angular, precise geometry.",
+    "Feedback is critical: when a slider moves, the route should update (debounce this).",
+    "Use z-index carefully to ensure the map doesn't cover dropdowns."
+  ]
+}
