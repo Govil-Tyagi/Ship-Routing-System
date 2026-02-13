@@ -1,30 +1,32 @@
 """
 Marine Routing System - FastAPI Backend
-Main server with A* routing endpoints and real-time weather updates.
+Main server with A* routing endpoints, authentication, and real-time weather updates.
 """
-from fastapi import FastAPI, APIRouter, HTTPException
-from fastapi.responses import JSONResponse
+from fastapi import FastAPI, APIRouter, HTTPException, Depends
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
 import os
 import logging
 from pathlib import Path
-from pydantic import BaseModel, Field
-from typing import List, Optional, Dict
+from pydantic import BaseModel
+from typing import List, Optional, Dict, Any
 import uuid
 from datetime import datetime, timezone
 
 # Import routing modules
 from models import (
-    Coordinate, Port, VesselType, VesselConfig, DangerZone, DangerType,
-    WeightConfig, RouteRequest, RouteResult, WeatherUpdate,
+    Coordinate, VesselType, WeightConfig,
     VESSEL_CONFIGS, MEDITERRANEAN_PORTS
 )
 from grid_generator import OceanGrid
 from a_star import AStarRouter
-from danger_zone import get_default_danger_zones, get_danger_zone_color, get_danger_zone_opacity
+from danger_zone import get_danger_zone_color, get_danger_zone_opacity
 from weather_simulator import get_weather_simulator
+from auth import (
+    UserCreate, UserLogin, TokenResponse, UserResponse,
+    hash_password, verify_password, create_access_token, get_current_user
+)
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -48,7 +50,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # Initialize global grid and router
-# Using 0.5 degree resolution for Mediterranean (balance between accuracy and speed)
+# Using 0.5 degree resolution for extended map (Mediterranean + Indian Ocean)
 GRID_RESOLUTION = 0.5
 ocean_grid = OceanGrid(resolution=GRID_RESOLUTION)
 router_instance = AStarRouter(ocean_grid)
@@ -113,7 +115,110 @@ class GridInfo(BaseModel):
     danger_nodes: int
 
 
-# ============ API Endpoints ============
+# ============ Auth Endpoints (Public) ============
+
+@api_router.post("/auth/signup", response_model=UserResponse, status_code=201)
+async def signup(user_data: UserCreate):
+    """
+    Register a new user account.
+    """
+    # Check if email already exists
+    existing_user = await db.users.find_one({"email": user_data.email}, {"_id": 0})
+    if existing_user:
+        raise HTTPException(
+            status_code=409,
+            detail="Email already registered"
+        )
+    
+    # Check if username already exists
+    existing_username = await db.users.find_one({"username": user_data.username}, {"_id": 0})
+    if existing_username:
+        raise HTTPException(
+            status_code=409,
+            detail="Username already taken"
+        )
+    
+    # Create user document
+    user_id = str(uuid.uuid4())
+    hashed_pwd = hash_password(user_data.password)
+    created_at = datetime.now(timezone.utc).isoformat()
+    
+    user_doc = {
+        "id": user_id,
+        "email": user_data.email,
+        "username": user_data.username,
+        "hashed_password": hashed_pwd,
+        "full_name": user_data.full_name,
+        "created_at": created_at
+    }
+    
+    await db.users.insert_one(user_doc)
+    
+    return UserResponse(
+        id=user_id,
+        email=user_data.email,
+        username=user_data.username,
+        full_name=user_data.full_name,
+        created_at=created_at
+    )
+
+
+@api_router.post("/auth/login", response_model=TokenResponse)
+async def login(credentials: UserLogin):
+    """
+    Authenticate user and issue JWT token.
+    """
+    # Find user by email
+    user = await db.users.find_one({"email": credentials.email}, {"_id": 0})
+    
+    if not user:
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid email or password",
+            headers={"WWW-Authenticate": "Bearer"}
+        )
+    
+    # Verify password
+    if not verify_password(credentials.password, user["hashed_password"]):
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid email or password",
+            headers={"WWW-Authenticate": "Bearer"}
+        )
+    
+    # Generate token
+    access_token = create_access_token(
+        user_id=user["id"],
+        email=user["email"],
+        username=user["username"]
+    )
+    
+    return TokenResponse(
+        access_token=access_token,
+        token_type="bearer",
+        user={
+            "id": user["id"],
+            "email": user["email"],
+            "username": user["username"],
+            "full_name": user.get("full_name")
+        }
+    )
+
+
+@api_router.get("/auth/me")
+async def get_me(current_user: Dict[str, Any] = Depends(get_current_user)):
+    """
+    Get current authenticated user's profile.
+    """
+    user = await db.users.find_one({"id": current_user["sub"]}, {"_id": 0, "hashed_password": 0})
+    
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    return user
+
+
+# ============ Public Endpoints ============
 
 @api_router.get("/")
 async def root():
@@ -187,10 +292,16 @@ async def get_grid_info():
     )
 
 
+# ============ Protected Endpoints (Require Login) ============
+
 @api_router.post("/calculate-route")
-async def calculate_route(request: RouteRequestAPI):
+async def calculate_route(
+    request: RouteRequestAPI,
+    current_user: Dict[str, Any] = Depends(get_current_user)
+):
     """
     Calculate optimal route using A* algorithm.
+    REQUIRES AUTHENTICATION.
     
     The route considers:
     - Fuel consumption based on vessel type
@@ -219,9 +330,8 @@ async def calculate_route(request: RouteRequestAPI):
             safety_priority=request.safety_priority
         )
         
-        logger.info(f"Calculating route from ({source.lat:.2f}, {source.lon:.2f}) "
-                   f"to ({destination.lat:.2f}, {destination.lon:.2f}) "
-                   f"with vessel {vessel_type.value}")
+        logger.info(f"User {current_user['username']} calculating route from "
+                   f"({source.lat:.2f}, {source.lon:.2f}) to ({destination.lat:.2f}, {destination.lon:.2f})")
         
         # Calculate route
         result = router_instance.find_route(source, destination, vessel_type, weights)
@@ -253,6 +363,8 @@ async def calculate_route(request: RouteRequestAPI):
         # Store route in database for history
         route_doc = {
             "id": str(uuid.uuid4()),
+            "user_id": current_user["sub"],
+            "username": current_user["username"],
             "source": {"lat": source.lat, "lon": source.lon},
             "destination": {"lat": destination.lat, "lon": destination.lon},
             "vessel_type": vessel_type.value,
@@ -274,10 +386,10 @@ async def calculate_route(request: RouteRequestAPI):
 
 
 @api_router.post("/simulate-weather")
-async def simulate_weather():
+async def simulate_weather(current_user: Dict[str, Any] = Depends(get_current_user)):
     """
     Simulate a weather change event.
-    Updates danger zones and returns new configuration.
+    REQUIRES AUTHENTICATION.
     """
     try:
         # Simulate weather change
@@ -312,8 +424,8 @@ async def simulate_weather():
 
 
 @api_router.post("/reset-weather")
-async def reset_weather():
-    """Reset weather to default conditions."""
+async def reset_weather(current_user: Dict[str, Any] = Depends(get_current_user)):
+    """Reset weather to default conditions. REQUIRES AUTHENTICATION."""
     try:
         update = weather_sim.reset_to_default()
         ocean_grid.apply_danger_zones(update.danger_zones)
@@ -343,11 +455,11 @@ async def reset_weather():
 
 
 @api_router.get("/route-history")
-async def get_route_history():
-    """Get recent route calculation history."""
+async def get_route_history(current_user: Dict[str, Any] = Depends(get_current_user)):
+    """Get user's route calculation history. REQUIRES AUTHENTICATION."""
     try:
         history = await db.route_history.find(
-            {}, 
+            {"user_id": current_user["sub"]}, 
             {"_id": 0}
         ).sort("calculated_at", -1).limit(10).to_list(10)
         
