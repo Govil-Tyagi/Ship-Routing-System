@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { MapContainer, TileLayer, Polyline, Polygon, Marker, Popup, Tooltip, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import axios from 'axios';
@@ -6,17 +7,39 @@ import { Toaster, toast } from 'sonner';
 import { 
   Anchor, Ship, Fuel, Clock, LifeBuoy, AlertTriangle, 
   CloudLightning, Skull, ShieldAlert, Wind, RefreshCw,
-  Navigation, Compass, MapPin
+  Navigation, Compass, MapPin, LogOut, User
 } from 'lucide-react';
 import { Slider } from './components/ui/slider';
 import { Button } from './components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './components/ui/select';
 import { Card, CardContent } from './components/ui/card';
 import { Badge } from './components/ui/badge';
+import { AuthProvider, useAuth } from './context/AuthContext';
+import LoginPage from './pages/LoginPage';
+import SignupPage from './pages/SignupPage';
 import '@/App.css';
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 const API = `${BACKEND_URL}/api`;
+
+// Protected Route Component
+const ProtectedRoute = ({ children }) => {
+  const { isAuthenticated, loading } = useAuth();
+  
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-[#020617] flex items-center justify-center">
+        <div className="w-8 h-8 border-4 border-sky-500 border-t-transparent rounded-full animate-spin"></div>
+      </div>
+    );
+  }
+  
+  if (!isAuthenticated) {
+    return <Navigate to="/login" replace />;
+  }
+  
+  return children;
+};
 
 // Custom vessel marker icon
 const createVesselIcon = () => {
@@ -99,14 +122,17 @@ function AnimatedVessel({ route, isAnimating }) {
   );
 }
 
-function App() {
+// Main Dashboard Component
+function Dashboard() {
+  const { user, token, logout } = useAuth();
+  
   // State
   const [ports, setPorts] = useState([]);
   const [vessels, setVessels] = useState([]);
   const [dangerZones, setDangerZones] = useState([]);
   const [selectedVessel, setSelectedVessel] = useState('cargo_ship');
-  const [sourcePort, setSourcePort] = useState('barcelona');
-  const [destPort, setDestPort] = useState('alexandria');
+  const [sourcePort, setSourcePort] = useState('mumbai');
+  const [destPort, setDestPort] = useState('chennai');
   const [priorities, setPriorities] = useState({
     fuel: 0.33,
     time: 0.33,
@@ -118,9 +144,17 @@ function App() {
   const [isAnimating, setIsAnimating] = useState(false);
   const [weatherAlert, setWeatherAlert] = useState(null);
   
-  // Mediterranean center
-  const mapCenter = [38.0, 15.0];
-  const mapZoom = 5;
+  // Extended map center (between Mediterranean and India)
+  const mapCenter = [25.0, 50.0];
+  const mapZoom = 4;
+  
+  // Axios instance with auth header
+  const authAxios = axios.create({
+    baseURL: API,
+    headers: {
+      Authorization: `Bearer ${token}`
+    }
+  });
   
   // Load initial data
   useEffect(() => {
@@ -158,7 +192,7 @@ function App() {
     setIsAnimating(false);
     
     try {
-      const response = await axios.post(`${API}/calculate-route`, {
+      const response = await authAxios.post('/calculate-route', {
         source_lat: source.lat,
         source_lon: source.lon,
         dest_lat: dest.lat,
@@ -188,16 +222,21 @@ function App() {
       }
     } catch (error) {
       console.error('Route calculation error:', error);
-      toast.error('Failed to calculate route');
+      if (error.response?.status === 401) {
+        toast.error('Session expired. Please login again.');
+        logout();
+      } else {
+        toast.error('Failed to calculate route');
+      }
     } finally {
       setIsCalculating(false);
     }
-  }, [sourcePort, destPort, selectedVessel, priorities, ports]);
+  }, [sourcePort, destPort, selectedVessel, priorities, ports, authAxios, logout]);
   
   // Simulate weather change
   const simulateWeather = useCallback(async () => {
     try {
-      const response = await axios.post(`${API}/simulate-weather`);
+      const response = await authAxios.post('/simulate-weather');
       setDangerZones(response.data.danger_zones);
       setWeatherAlert({
         message: response.data.message,
@@ -205,31 +244,39 @@ function App() {
       });
       toast.warning(response.data.message, { icon: <CloudLightning size={18} /> });
       
-      // Clear alert after 5 seconds
       setTimeout(() => setWeatherAlert(null), 5000);
       
-      // Recalculate route if one exists
       if (route) {
         toast.info('Recalculating route due to weather change...');
         setTimeout(calculateRoute, 500);
       }
     } catch (error) {
       console.error('Weather simulation error:', error);
-      toast.error('Failed to simulate weather');
+      if (error.response?.status === 401) {
+        toast.error('Session expired. Please login again.');
+        logout();
+      } else {
+        toast.error('Failed to simulate weather');
+      }
     }
-  }, [route, calculateRoute]);
+  }, [route, calculateRoute, authAxios, logout]);
   
   // Reset weather
   const resetWeather = useCallback(async () => {
     try {
-      const response = await axios.post(`${API}/reset-weather`);
+      const response = await authAxios.post('/reset-weather');
       setDangerZones(response.data.danger_zones);
       toast.success('Weather reset to default conditions');
     } catch (error) {
       console.error('Weather reset error:', error);
-      toast.error('Failed to reset weather');
+      if (error.response?.status === 401) {
+        toast.error('Session expired. Please login again.');
+        logout();
+      } else {
+        toast.error('Failed to reset weather');
+      }
     }
-  }, []);
+  }, [authAxios, logout]);
   
   // Get danger zone icon
   const getDangerIcon = (type) => {
@@ -256,7 +303,6 @@ function App() {
       .filter(([k]) => k !== key)
       .reduce((sum, [, v]) => sum + v, 0);
     
-    // Normalize other values
     const remaining = 1 - newValue;
     const scale = total > 0 ? remaining / total : 0;
     
@@ -272,21 +318,46 @@ function App() {
     setPriorities(newPriorities);
   };
 
+  // Handle logout
+  const handleLogout = () => {
+    logout();
+    toast.success('Logged out successfully');
+  };
+
   return (
     <div className="app-container" data-testid="marine-routing-app">
       <Toaster position="top-right" richColors />
       
       {/* Control Panel */}
       <div className="control-panel" data-testid="control-panel">
-        {/* Header */}
-        <div className="flex items-center gap-3 mb-4">
-          <div className="p-2 bg-sky-500/20 rounded">
-            <Navigation className="text-sky-400" size={24} />
+        {/* Header with User Info */}
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-sky-500/20 rounded">
+              <Navigation className="text-sky-400" size={24} />
+            </div>
+            <div>
+              <h1 className="font-heading text-xl font-bold text-slate-100">Marine Router</h1>
+              <p className="text-xs text-slate-400">A* Pathfinding System</p>
+            </div>
           </div>
-          <div>
-            <h1 className="font-heading text-xl font-bold text-slate-100">Marine Router</h1>
-            <p className="text-xs text-slate-400">A* Pathfinding System</p>
+        </div>
+        
+        {/* User Info */}
+        <div className="flex items-center justify-between p-3 bg-slate-800/50 rounded-lg mb-4" data-testid="user-info">
+          <div className="flex items-center gap-2">
+            <User size={16} className="text-sky-400" />
+            <span className="text-sm text-slate-300 font-medium">{user?.username}</span>
           </div>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleLogout}
+            className="text-slate-400 hover:text-red-400 hover:bg-red-400/10"
+            data-testid="logout-btn"
+          >
+            <LogOut size={16} />
+          </Button>
         </div>
         
         {/* Port Selection */}
@@ -299,7 +370,7 @@ function App() {
               <SelectTrigger className="flex-1 bg-slate-800 border-slate-700 text-slate-100">
                 <SelectValue placeholder="Source Port" />
               </SelectTrigger>
-              <SelectContent className="bg-slate-800 border-slate-700">
+              <SelectContent className="bg-slate-800 border-slate-700 max-h-60">
                 {ports.map(port => (
                   <SelectItem key={port.id} value={port.id} className="text-slate-100 hover:bg-slate-700">
                     {port.name}
@@ -315,7 +386,7 @@ function App() {
               <SelectTrigger className="flex-1 bg-slate-800 border-slate-700 text-slate-100">
                 <SelectValue placeholder="Destination Port" />
               </SelectTrigger>
-              <SelectContent className="bg-slate-800 border-slate-700">
+              <SelectContent className="bg-slate-800 border-slate-700 max-h-60">
                 {ports.map(port => (
                   <SelectItem key={port.id} value={port.id} className="text-slate-100 hover:bg-slate-700">
                     {port.name}
@@ -637,6 +708,28 @@ function App() {
         )}
       </div>
     </div>
+  );
+}
+
+function App() {
+  return (
+    <BrowserRouter>
+      <AuthProvider>
+        <Routes>
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/signup" element={<SignupPage />} />
+          <Route 
+            path="/" 
+            element={
+              <ProtectedRoute>
+                <Dashboard />
+              </ProtectedRoute>
+            } 
+          />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </AuthProvider>
+    </BrowserRouter>
   );
 }
 
