@@ -2,10 +2,11 @@
 
 /* Main Layout */
 .app-container {
-  display: grid;
-  grid-template-columns: 320px 1fr;
+  display: flex;
+  flex-direction: row;
   height: 100vh;
   overflow: hidden;
+  width: 100%;
 }
 
 /* Control Panel */
@@ -17,13 +18,17 @@
   overflow-y: auto;
   background: #0F172A;
   border-right: 1px solid rgba(148, 163, 184, 0.1);
+  width: 320px;
+  min-width: 320px;
+  flex-shrink: 0;
 }
 
 /* Map Container */
 .map-container {
   position: relative;
-  width: 100%;
+  flex: 1;
   height: 100%;
+  min-width: 0;
 }
 
 /* Stats Overlay */
